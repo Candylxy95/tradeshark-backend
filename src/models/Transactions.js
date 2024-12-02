@@ -24,9 +24,26 @@ const createExternalTransactionTable = async () => {
 const createInternalTransactionTable = async () => {
   const query = `
     CREATE TABLE IF NOT EXISTS internal_transactions (
-      
-  )
-}`;
+      buyer_id UUID NOT NULL,
+      seller_id UUID NOT NULL,
+      listing_id UUID NOT NULL,
+      price DECIMAL(10,2) DEFAULT 0.00 NOT NULL,
+      purchased_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (buyer_id) references users(id),
+      FOREIGN KEY (seller_id, listing_id) REFERENCES listings(seller_id, id),
+      PRIMARY KEY (seller_id, listing_id)
+  );
+  `;
+
+  try {
+    await pool.query(query);
+    console.log("Internal Transaction table created successfully.");
+  } catch (err) {
+    console.error("Error creating Internal Transaction table: ", err);
+  }
 };
 
-module.exports = { createExternalTransactionTable };
+module.exports = {
+  createExternalTransactionTable,
+  createInternalTransactionTable,
+};

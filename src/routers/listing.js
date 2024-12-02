@@ -1,8 +1,15 @@
 const express = require("express");
-const { createListing, updateListing } = require("../controllers/listings");
+const {
+  createListing,
+  updateListing,
+  viewActiveListing,
+  viewExpiredListing,
+} = require("../controllers/listings");
 const router = express.Router();
 
-router.post("/listing", createListing);
-router.put("/listing/:id", updateListing);
+router.post("/", createListing);
+router.put("/:id", updateListing);
+router.get("/active", viewActiveListing);
+router.get("/past", viewExpiredListing);
 
 module.exports = router;

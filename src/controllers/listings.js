@@ -12,7 +12,7 @@ const createListing = async (req, res) => {
       throw new Error("User not found or invalid role.");
     }
 
-    const listingQuery = `INSERT INTO listings (user_id, ticker, asset_class, position, entry_price, 
+    const listingQuery = `INSERT INTO listings (seller_id, ticker, asset_class, position, entry_price, 
         take_profit, stop_loss, price, notes, duration, img_src) 
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`;
 
@@ -48,47 +48,59 @@ const createListing = async (req, res) => {
 
 const viewActiveListing = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1 AND role = $2`;
-    const existingUser = await pool.query(findUser, [
-      req.decoded.id,
-      "ts_seller",
-    ]);
+    const findUser = `SELECT * FROM users WHERE id = $1`;
+    const existingUser = await pool.query(findUser, [req.decoded.id]);
 
     if (existingUser.rows.length === 0) {
       throw new Error("User not found or invalid role.");
     }
 
-    const listingQuery = `INSERT INTO listings (user_id, ticker, asset_class, position, entry_price, 
-            take_profit, stop_loss, price, notes, duration, img_src) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`;
+    const viewQuery = `SELECT * FROM listings WHERE NOW() < expires_at`;
 
-    const listingValues = [
-      req.decoded.id,
-      req.body.ticker,
-      req.body.asset_class,
-      req.body.position,
-      req.body.entry_price,
-      req.body.take_profit,
-      req.body.stop_loss,
-      req.body.price,
-      req.body.notes,
-      req.body.duration,
-      req.body.img_src,
-    ];
+    const activeListing = await pool.query(viewQuery);
 
-    const newListing = await pool.query(listingQuery, listingValues);
-
-    if (newListing.rowCount === 0) {
-      return res.status(404).json({ msg: "Failed to create listing." });
+    if (activeListing.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve active listings." });
     }
 
     res.status(200).json({
-      msg: "Listed successfully.",
-      listing: newListing.rows[0],
+      msg: "Active listings successfully retrieved.",
+      listing: activeListing.rows[0],
     });
   } catch (err) {
-    console.error("Listing error", err);
-    res.status(500).json({ msg: "Listing failed." });
+    console.error("View listing error", err);
+    res.status(500).json({ msg: "View listing failed." });
+  }
+};
+
+const viewExpiredListing = async (req, res) => {
+  try {
+    const findUser = `SELECT * FROM users WHERE id = $1`;
+    const existingUser = await pool.query(findUser, [req.decoded.id]);
+
+    if (existingUser.rows.length === 0) {
+      throw new Error("User not found or invalid role.");
+    }
+
+    const viewQuery = `SELECT * FROM listings WHERE NOW() > expires_at`;
+
+    const activeListing = await pool.query(viewQuery);
+
+    if (activeListing.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve expired listings." });
+    }
+
+    res.status(200).json({
+      msg: "Past listings successfully retrieved.",
+      listing: activeListing.rows[0],
+    });
+  } catch (err) {
+    console.error("View listing error", err);
+    res.status(500).json({ msg: "View listing failed." });
   }
 };
 
@@ -143,4 +155,9 @@ const updateListing = async (req, res) => {
   }
 };
 
-module.exports = { createListing, updateListing };
+module.exports = {
+  createListing,
+  viewActiveListing,
+  viewExpiredListing,
+  updateListing,
+};
