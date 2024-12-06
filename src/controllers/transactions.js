@@ -48,6 +48,7 @@ const depositMoney = async (req, res) => {
       transaction: newTransaction.rows[0],
     });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("Deposit error", err);
     res.status(500).json({ msg: "Deposit failed." });
   } finally {
@@ -103,6 +104,7 @@ const withdrawMoney = async (req, res) => {
       transaction: newTransaction.rows[0],
     });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("Deposit error", err);
     res.status(500).json({ msg: "Deposit failed." });
   } finally {
@@ -114,15 +116,38 @@ const purchaseListing = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const findUser = `SELECT * FROM users WHERE id = $1 AND role = $2`;
-    const existingUser = await client.query(findUser, [
-      req.decoded.id,
-      req.decoded.role,
-    ]);
+    const findUser = `SELECT * FROM users WHERE id = $1 AND role = 'ts_buyer'`;
+    const existingUser = await client.query(findUser, [req.decoded.id]);
 
     if (existingUser.rows.length === 0) {
       throw new Error("User not found or invalid role.");
     }
+
+    if (existingUser.rows[0].balance < req.body.price) {
+      throw new Error("Insufficient balance to complete the purchase.");
+    }
+
+    if (req.decoded.id === req.body.seller_id) {
+      throw new Error("Cannot purchase your own listing.");
+    }
+
+    //add condition that if buyers already have this existing listing - disallow purchase.
+
+    const listingDetailsQuery = `SELECT id, price, expires_at FROM listings WHERE id = $1`;
+    const listingDetails = await client.query(listingDetailsQuery, [
+      req.body.listing_id,
+    ]);
+    if (listingDetails.rows.length === 0) {
+      throw new Error("Listing not found.");
+    }
+
+    const currentTime = new Date();
+    const expiryTime = new Date(listingDetails.rows[0].expires_at);
+    if (currentTime > expiryTime) {
+      throw new Error("Unable to purchase expired listing.");
+    }
+
+    const listingPrice = listingDetails.rows[0].price;
 
     const transactionQuery = `INSERT INTO internal_transactions (buyer_id, seller_id, listing_id, price) VALUES ($1, $2, $3, $4) RETURNING *;`;
 
@@ -130,7 +155,7 @@ const purchaseListing = async (req, res) => {
       req.decoded.id,
       req.body.seller_id,
       req.body.listing_id,
-      req.body.price,
+      listingPrice,
     ];
 
     const newTransaction = await client.query(
@@ -138,22 +163,22 @@ const purchaseListing = async (req, res) => {
       transactionValues
     );
 
-    const updateBuyerBalanceQuery = `UPDATE users SET balance = balance - $1 WHERE id = $2 AND role = $3 RETURNING id, first_name, balance;`;
+    const updateBuyerBalanceQuery = `UPDATE users SET balance = balance - $1 WHERE id = $2 AND role = $3 RETURNING id, first_name, last_name, balance;`;
 
-    const updateBuyerBalanceValues = [
-      req.body.amount,
-      req.decoded.id,
-      req.decoded.role,
-    ];
+    const updateBuyerBalanceValues = [listingPrice, req.decoded.id, "ts_buyer"];
 
     const updatedBuyerBalance = await client.query(
       updateBuyerBalanceQuery,
       updateBuyerBalanceValues
     );
 
-    const updateSellerBalanceQuery = `UPDATE users SET balance = balance + $1 WHERE id = $2 AND role = $3 RETURNING id, first_name, balance;`;
+    const updateSellerBalanceQuery = `UPDATE users SET balance = balance + $1 WHERE id = $2 AND role = $3 RETURNING id, first_name, last_name, balance;`;
 
-    const updateSellerBalanceValues = [req.body.amount, req.seller_id];
+    const updateSellerBalanceValues = [
+      listingPrice,
+      req.body.seller_id,
+      "ts_seller",
+    ];
 
     const updatedSellerBalance = await client.query(
       updateSellerBalanceQuery,
@@ -162,14 +187,16 @@ const purchaseListing = async (req, res) => {
 
     await client.query("COMMIT");
     res.status(200).json({
-      msg: "Deposit successful.",
+      msg: "Listing purchase successful.",
       buyer_balance: updatedBuyerBalance.rows[0],
       seller_balance: updatedSellerBalance.rows[0],
       transaction: newTransaction.rows[0],
+      listing_details: listingDetails.rows[0],
     });
   } catch (err) {
-    console.error("Deposit error", err);
-    res.status(500).json({ msg: "Deposit failed." });
+    await client.query("ROLLBACK");
+    console.error("Purchase transaction error", err);
+    res.status(500).json({ msg: "Purchase transaction failed." });
   } finally {
     client.release();
   }
