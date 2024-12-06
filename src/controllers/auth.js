@@ -5,10 +5,11 @@ const { v4: uuidv4 } = require("uuid");
 
 const registration = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE email = $1 OR phone_number = $2`;
+    const findUser = `SELECT * FROM users WHERE email = $1 OR phone_number = $2 AND role = $3`;
     const existingUser = await pool.query(findUser, [
       req.body.email,
       req.body.phone_number,
+      req.body.role,
     ]);
 
     if (existingUser.rows.length > 0) {
@@ -28,7 +29,7 @@ const registration = async (req, res) => {
       req.body.email,
       req.body.phone_number,
       hashedPassword,
-      req.body.role || "ts_buyer",
+      req.body.role,
     ];
 
     const newUser = await pool.query(createUser, values);
@@ -45,12 +46,19 @@ const registration = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE email = $1 OR phone_number = $2`;
+    if (!req.body.email && !req.body.phone_number) {
+      return res.status(400).json({ msg: "Email or phone number is required" });
+    }
+    if (!req.body.password) {
+      return res.status(400).json({ msg: "Password is required" });
+    }
+    const findUser = `SELECT * FROM users WHERE (email = $1 OR phone_number = $2) AND role = $3`;
     const existingUser = await pool.query(findUser, [
       req.body.email,
-      req.body.password,
+      req.body.phone_number,
+      req.body.role,
     ]);
-    if (!existingUser) {
+    if (existingUser.rows.length === 0) {
       return res.status(400).json({ msg: "Incorrect credentials" });
     }
 
@@ -81,7 +89,6 @@ const login = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ msg: "Login failed." });
-    res.redirect("/");
   }
 };
 

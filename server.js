@@ -10,7 +10,9 @@ const { setUpDatabase } = require("./src/db/index");
 const authRouter = require("./src/routers/auth");
 const listingRouter = require("./src/routers/listing");
 const externalTransactionRouter = require("./src/routers/externalTransactions");
+const internalTransactionRouter = require("./src/routers/internalTransaction");
 const reviewRouter = require("./src/routers/review");
+const userRouter = require("./src/routers/user");
 const { isSignedIn } = require("./src/middleware/auth");
 
 const limiter = rateLimit({
@@ -31,9 +33,12 @@ app.use(express.urlencoded({ extended: false }));
 
 app.use("/auth", authRouter);
 app.use(isSignedIn);
-app.use("/listing", listingRouter);
+app.use("/user", userRouter);
 app.use("/transaction", externalTransactionRouter);
+app.use("/transaction", internalTransactionRouter);
+
 app.use("/review", reviewRouter);
+app.use("/listing", listingRouter);
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {

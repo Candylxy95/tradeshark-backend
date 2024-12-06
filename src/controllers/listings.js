@@ -55,7 +55,17 @@ const viewActiveListing = async (req, res) => {
       throw new Error("User not found or invalid role.");
     }
 
-    const viewQuery = `SELECT * FROM listings WHERE NOW() < expires_at`;
+    const viewQuery = `SELECT lst.*,
+    TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
+TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
+TO_CHAR(lst.expires_at, 'YYYY-MM-DD') AS expiry_date,
+TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
+    users.first_name,
+    users.last_name
+    FROM listings lst
+    JOIN users 
+    ON lst.seller_id = users.id 
+    WHERE NOW() < expires_at ORDER BY posted_at DESC;`;
 
     const activeListing = await pool.query(viewQuery);
 
@@ -67,7 +77,7 @@ const viewActiveListing = async (req, res) => {
 
     res.status(200).json({
       msg: "Active listings successfully retrieved.",
-      listing: activeListing.rows[0],
+      listing: activeListing.rows,
     });
   } catch (err) {
     console.error("View listing error", err);
@@ -84,7 +94,17 @@ const viewExpiredListing = async (req, res) => {
       throw new Error("User not found or invalid role.");
     }
 
-    const viewQuery = `SELECT * FROM listings WHERE NOW() > expires_at`;
+    const viewQuery = `SELECT lst.*,
+    TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
+TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
+TO_CHAR(lst.expires_at, 'YYYY-MM-DD') AS expiry_date,
+TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
+    users.first_name,
+    users.last_name
+    FROM listings lst
+    JOIN users 
+    ON lst.seller_id = users.id 
+    WHERE NOW() > expires_at;`;
 
     const activeListing = await pool.query(viewQuery);
 
@@ -96,7 +116,7 @@ const viewExpiredListing = async (req, res) => {
 
     res.status(200).json({
       msg: "Past listings successfully retrieved.",
-      listing: activeListing.rows[0],
+      listing: activeListing.rows,
     });
   } catch (err) {
     console.error("View listing error", err);
