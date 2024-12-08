@@ -55,4 +55,22 @@ const updateUserBalance = async (req, res) => {
   }
 };
 
-module.exports = { viewUserById, updateUserBalance };
+const viewUserProfileById = async (req, res) => {
+  try {
+    const viewQuery = `SELECT * FROM user_profiles WHERE user_id = $1`;
+    const userProfile = await pool.query(viewQuery, [req.decoded.id]);
+
+    if (userProfile.rows[0] === 0) {
+      return res.status(404).json({ msg: "User profile not found" });
+    }
+    res.status(200).json({
+      msg: "User info successfully retrieved.",
+      profile: userProfile.rows[0],
+    });
+  } catch (err) {
+    console.error("View user profile error", err);
+    res.status(500).json({ msg: "View user profile failed." });
+  }
+};
+
+module.exports = { viewUserById, updateUserBalance, viewUserProfileById };

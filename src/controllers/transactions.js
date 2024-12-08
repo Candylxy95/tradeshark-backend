@@ -202,6 +202,7 @@ const purchaseListing = async (req, res) => {
   }
 };
 
+//merged with purchase listing - should be can delete
 const createInternalTransaction = async (req, res) => {
   try {
     const inTransactionQuery = `INSERT INTO internal_transactions (buyer_id, seller_id, listing_id, price) 
@@ -220,7 +221,9 @@ const createInternalTransaction = async (req, res) => {
     );
 
     if (newInTransaction.rowCount === 0) {
-      return res.status(404).json({ msg: "Failed to create listing." });
+      return res
+        .status(404)
+        .json({ msg: "Failed to create internal transaction." });
     }
 
     res.status(200).json({
@@ -233,6 +236,7 @@ const createInternalTransaction = async (req, res) => {
   }
 };
 
+//Buyer view purchases
 const viewInTransactionsByUserId = async (req, res) => {
   try {
     const findUser = `SELECT * FROM users WHERE id = $1`;
@@ -275,10 +279,115 @@ const viewInTransactionsByUserId = async (req, res) => {
   }
 };
 
+//Seller view sales
+const viewInTransactionsBySellerId = async (req, res) => {
+  try {
+    const findUser = `SELECT * FROM users WHERE id = $1`;
+    const existingUser = await pool.query(findUser, [req.decoded.id]);
+
+    if (existingUser.rows.length === 0) {
+      throw new Error("User not found or invalid role.");
+    }
+
+    const viewQuery = `SELECT listings.ticker AS ticker,
+    users.first_name AS buyer_first_name,
+    users.last_name AS buyer_last_name,
+    it.price,
+    TO_CHAR(it.purchased_on, 'YYYY-MM-DD') AS purchased_date,
+    TO_CHAR(it.purchased_on, 'HH24:MI:SS') AS purchased_time
+    FROM internal_transactions it
+    JOIN listings 
+    ON listing_id = listings.id
+    JOIN users
+    ON it.buyer_id = users.id
+    WHERE it.seller_id = $1 ORDER BY purchased_on DESC`;
+
+    const viewValues = [req.decoded.id];
+
+    const inTransactionList = await pool.query(viewQuery, viewValues);
+
+    if (inTransactionList.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve internal transactions." });
+    }
+
+    res.status(200).json({
+      msg: "Active listings successfully retrieved.",
+      inTransaction: inTransactionList.rows,
+    });
+  } catch (err) {
+    console.error("View internal transaction error", err);
+    res.status(500).json({ msg: "View internal transaction failed." });
+  }
+};
+
+const viewSubTransactionBySellerId = async (req, res) => {
+  try {
+    const viewQuery = `SELECT
+    users.first_name AS buyer_first_name,
+    users.last_name AS buyer_last_name,
+    st.price,
+    st.seller_id
+    TO_CHAR(st.purchased_on, 'YYYY-MM-DD') AS purchased_date,
+    TO_CHAR(st.purchased_on, 'HH24:MI:SS') AS purchased_time
+    FROM subscription_transactions st
+    JOIN users
+    ON buyer_id = users.id
+    WHERE st.seller_id = $1 ORDER BY purchased_on DESC`;
+
+    const viewValues = [req.decoded.id];
+
+    const subTransactionList = await pool.query(viewQuery, viewValues);
+
+    if (subTransactionList.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve sub transactions." });
+    }
+
+    res.status(200).json({
+      msg: "Sub transactions successfully retrieved.",
+      subTransaction: subTransactionList.rows,
+    });
+  } catch (err) {
+    console.error("View sub transaction error", err);
+    res.status(500).json({ msg: "View sub transaction failed." });
+  }
+};
+
+const viewSubTransactionByUserId = async (req, res) => {
+  try {
+    const viewQuery = `SELECT * FROM subcription_transactions
+    WHERE buyer_id = $1 ORDER BY purchased_on DESC`;
+
+    const viewValues = [req.decoded.id];
+
+    const subTransactionList = await pool.query(viewQuery, viewValues);
+
+    if (subTransactionList.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve sub transactions." });
+    }
+
+    res.status(200).json({
+      msg: "Sub transactions successfully retrieved.",
+      subTransaction: subTransactionList.rows,
+    });
+  } catch (err) {
+    console.error("View sub transaction error", err);
+    res.status(500).json({ msg: "View sub transaction failed." });
+  }
+};
+
 module.exports = {
   depositMoney,
   withdrawMoney,
   createInternalTransaction,
   viewInTransactionsByUserId,
+  viewInTransactionsBySellerId,
   purchaseListing,
+  viewSubTransactionBySellerId,
+  viewSubTransactionByUserId,
 };

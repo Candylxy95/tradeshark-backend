@@ -51,13 +51,19 @@ const authSeller = (req, res, next) => {
   }
 };
 
-module.exports = { isSignedIn, authBuyer, authSeller };
+const isUser = async (req, res, next) => {
+  try {
+    const findUser = `SELECT * FROM users WHERE id = $1`;
+    const existingUser = await pool.query(findUser, [req.decoded.id]);
 
-// const findUser = `SELECT * FROM users WHERE id = $1 AND role = $2`;
-// const existingUser = await pool.query(findUser, [
-//   req.decoded.id,
-//   "ts_seller",
-// ]);
+    if (existingUser.rows.length === 0) {
+      throw new Error("User not authenticated");
+    }
+    next();
+  } catch (error) {
+    console.error(error.message);
+    return res.status(401).json({ status: "error", msg: "not authorised" });
+  }
+};
 
-// if (existingUser.rows.length === 0) {
-//   throw new Error("User not found or invalid role.");
+module.exports = { isSignedIn, authBuyer, authSeller, isUser };

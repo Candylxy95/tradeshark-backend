@@ -7,7 +7,7 @@ const createListingTable = async () => {
            seller_id UUID NOT NULL,
            img_src VARCHAR(255),
            ticker VARCHAR(10),
-           asset_class VARCHAR(10) NOT NULL CHECK (asset_class IN ('Stock', 'Forex')),
+           asset_class VARCHAR(10) NOT NULL CHECK (asset_class IN ('Stocks', 'Forex')),
            position VARCHAR(10) NOT NULL CHECK (position IN ('Long', 'Short')),
            entry_price DECIMAL(10,2) NOT NULL,
            take_profit DECIMAL(10,2) NOT NULL,
@@ -19,6 +19,7 @@ const createListingTable = async () => {
            duration INTERVAL NOT NULL,
            expires_at TIMESTAMP GENERATED ALWAYS AS (posted_at + duration) STORED,
            likes NUMERIC DEFAULT 0 NOT NULL,
+           sold_as_single_listing BOOLEAN DEFAULT TRUE NOT NULL,
            FOREIGN KEY (seller_id) references users(id),
            CONSTRAINT seller_and_listing_id UNIQUE (seller_id, id)
         );
@@ -51,6 +52,7 @@ const createListingHistoryTable = async () => {
     posted_at TIMESTAMP NOT NULL,
     duration INTERVAL NOT NULL,
     expires_at TIMESTAMP GENERATED ALWAYS AS (posted_at + duration) STORED,
+    sold_as_single_listing BOOLEAN DEFAULT TRUE NOT NULL,
     action VARCHAR(20) DEFAULT 'UPDATE' NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
  );`;
@@ -68,8 +70,8 @@ const createUpdateTrigger = async () => {
   RETURNS TRIGGER AS $$
   BEGIN
   IF (TG_OP = 'UPDATE') THEN
-      INSERT INTO listing_history (listing_id, seller_id, img_src, ticker, asset_class, position, entry_price, take_profit, stop_loss, notes, posted_at, duration, action, updated_at)
-      VALUES (OLD.id, OLD.user_id, OLD.img_src, OLD.ticker, OLD.asset_class, OLD.position, OLD.entry_price, OLD.take_profit, OLD.stop_loss, OLD.notes, OLD.posted_at, OLD.duration, 'UPDATE', CURRENT_TIMESTAMP);
+      INSERT INTO listing_history (listing_id, seller_id, img_src, ticker, asset_class, position, entry_price, take_profit, stop_loss, notes, posted_at, duration, sold_as_single_listing, action, updated_at)
+      VALUES (OLD.id, OLD.seller_id, OLD.img_src, OLD.ticker, OLD.asset_class, OLD.position, OLD.entry_price, OLD.take_profit, OLD.stop_loss, OLD.notes, OLD.posted_at, OLD.duration, OLD.sold_as_single_listing, 'UPDATE', CURRENT_TIMESTAMP);
       RETURN NEW;
       END IF;
       RETURN NULL;

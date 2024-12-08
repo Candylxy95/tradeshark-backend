@@ -13,6 +13,7 @@ const externalTransactionRouter = require("./src/routers/externalTransactions");
 const internalTransactionRouter = require("./src/routers/internalTransaction");
 const reviewRouter = require("./src/routers/review");
 const userRouter = require("./src/routers/user");
+const subscriptionRouter = require("./src/routers/subscription");
 const { isSignedIn } = require("./src/middleware/auth");
 
 const limiter = rateLimit({
@@ -39,6 +40,7 @@ app.use("/transaction", internalTransactionRouter);
 
 app.use("/review", reviewRouter);
 app.use("/listing", listingRouter);
+app.use("/subscription", subscriptionRouter);
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
