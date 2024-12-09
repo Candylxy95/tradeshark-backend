@@ -149,7 +149,24 @@ const purchaseListing = async (req, res) => {
 
     const listingPrice = listingDetails.rows[0].price;
 
-    const transactionQuery = `INSERT INTO internal_transactions (buyer_id, seller_id, listing_id, price) VALUES ($1, $2, $3, $4) RETURNING *;`;
+    //check if buyer alrd bought this listing
+    const existTransactionQuery = `SELECT * FROM internal_transactions WHERE seller_id = $1 AND listing_id = $2 AND buyer_id =$3;`;
+    const existTransactionValues = [
+      req.body.seller_id,
+      req.body.listing_id,
+      req.decoded.id,
+    ];
+    const existingTransaction = await client.query(
+      existTransactionQuery,
+      existTransactionValues
+    );
+
+    if (existingTransaction.rows.length > 0) {
+      throw new Error("Transaction for this listing already exists.");
+    }
+
+    const transactionQuery = `INSERT INTO internal_transactions (buyer_id, seller_id, listing_id, price) 
+    VALUES ($1, $2, $3, $4) RETURNING *;`;
 
     const transactionValues = [
       req.decoded.id,

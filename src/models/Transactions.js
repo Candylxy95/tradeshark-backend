@@ -31,7 +31,7 @@ const createInternalTransactionTable = async () => {
       purchased_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (buyer_id) REFERENCES users(id),
       FOREIGN KEY (seller_id, listing_id) REFERENCES listings(seller_id, id),
-      PRIMARY KEY (seller_id, listing_id)
+      PRIMARY KEY (seller_id, listing_id, buyer_id)
   );
   `;
 

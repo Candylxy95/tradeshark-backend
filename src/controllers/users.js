@@ -57,7 +57,15 @@ const updateUserBalance = async (req, res) => {
 
 const viewUserProfileById = async (req, res) => {
   try {
-    const viewQuery = `SELECT * FROM user_profiles WHERE user_id = $1`;
+    const viewQuery = `SELECT up.*,
+    users.first_name AS first_name,
+    users.last_name AS last_name,
+    users.email AS email,
+    users.phone_number AS phone_number
+    FROM user_profiles up 
+    JOIN users 
+    ON up.user_id = users.id
+    WHERE user_id = $1;`;
     const userProfile = await pool.query(viewQuery, [req.decoded.id]);
 
     if (userProfile.rows[0] === 0) {
@@ -73,4 +81,66 @@ const viewUserProfileById = async (req, res) => {
   }
 };
 
-module.exports = { viewUserById, updateUserBalance, viewUserProfileById };
+const updateUserProfileById = async (req, res) => {
+  try {
+    const updateQuery = `UPDATE user_profiles 
+    SET bio = COALESCE($1, bio), 
+    profile_img = COALESCE($2, profile_img) 
+    WHERE user_id = $3`;
+    const updateValues = [req.body.bio, req.body.profile_img, req.decoded.id];
+    const updatedProfile = await pool.query(updateQuery, updateValues);
+
+    if (updatedProfile.rows[0] === 0) {
+      return res.status(404).json({ msg: "User profile not updated" });
+    }
+    res.status(200).json({
+      msg: "User profile successfully updated.",
+      profile: updatedProfile.rows[0],
+    });
+  } catch (err) {
+    console.error("Update user profile error", err);
+    res.status(500).json({ msg: "Update user profile failed." });
+  }
+};
+
+const updateUserById = async (req, res) => {
+  try {
+    const updateQuery = `UPDATE users SET first_name = COALESCE($1, first_name), 
+    last_name = COALESCE($2, last_name), 
+    phone_number = COALESCE($3, phone_number), 
+    email = COALESCE($4, email) 
+    WHERE users.id = $5 RETURNING *;`;
+
+    const updateValues = [
+      req.body.first_name,
+      req.body.last_name,
+      req.body.phone_number,
+      req.body.email,
+      req.decoded.id,
+    ];
+
+    const updatedUser = await pool.query(updateQuery, updateValues);
+
+    if (updatedUser.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ msg: "User not found or no changes made." });
+    }
+
+    res.status(200).json({
+      msg: "User updated successfully.",
+      user: updatedUser.rows[0],
+    });
+  } catch (err) {
+    console.error("User update error", err);
+    res.status(500).json({ msg: "Update of user failed." });
+  }
+};
+
+module.exports = {
+  viewUserById,
+  updateUserBalance,
+  viewUserProfileById,
+  updateUserProfileById,
+  updateUserById,
+};
