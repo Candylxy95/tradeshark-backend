@@ -1,3 +1,4 @@
+const { pool } = require("../db/db");
 const {
   createUserTable,
   createProfileTable,
@@ -16,6 +17,15 @@ const {
 const { createReviewsTable } = require("../models/Reviews");
 const { createSubscriptionsTable } = require("../models/Subscriptions");
 
+const setUpTimeZone = async () => {
+  try {
+    await pool.query(`SET TIME ZONE 'Asia/Singapore'`);
+    console.log(`Time zone set to singapore`);
+  } catch (error) {
+    console.error("Error setting time zone: ", error.message);
+  }
+};
+
 const setUpDatabase = async () => {
   await createUserTable();
   await createExternalTransactionTable();
@@ -30,4 +40,4 @@ const setUpDatabase = async () => {
   await createProfileTrigger();
 };
 
-module.exports = { setUpDatabase };
+module.exports = { setUpDatabase, setUpTimeZone };

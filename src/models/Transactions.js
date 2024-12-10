@@ -50,6 +50,7 @@ const createSubscriptionTransactionTable = async () => {
       seller_id UUID NOT NULL,
       price DECIMAL(10,2) DEFAULT 0.00 NOT NULL,
       purchased_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP GENERATED ALWAYS AS (purchased_on + INTERVAL '1 month') STORED,
       FOREIGN KEY (buyer_id) references users(id),
       FOREIGN KEY (seller_id) REFERENCES subscriptions(seller_id),
       PRIMARY KEY (seller_id, buyer_id)

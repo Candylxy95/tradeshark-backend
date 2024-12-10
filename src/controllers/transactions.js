@@ -1,4 +1,30 @@
 const { pool } = require("../db/db");
+const Stripe = require("stripe");
+const stripe = Stripe(process.env.STRIPE_SECRET);
+
+const getStripeKey = async (req, res) => {
+  try {
+    res
+      .status(200)
+      .json({ publishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
+  } catch (error) {
+    console.error("unable to get stripe key", error.message);
+  }
+};
+
+const sendPaymentRequest = async (req, res) => {
+  try {
+    const paymentRequest = await stripe.paymentIntents.create({
+      amount: req.body.amount,
+      currency: "sgd",
+      payment_method_types: ["card"],
+    });
+    res.status(200).json({ clientSecret: paymentRequest.client_secret });
+  } catch (error) {
+    console.error("Error creating payments", error);
+    res.status(500).json({ msg: "Deposit failed." });
+  }
+};
 
 const depositMoney = async (req, res) => {
   if (req.decoded.role !== "ts_buyer") {
@@ -116,16 +142,8 @@ const purchaseListing = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const findUser = `SELECT * FROM users WHERE id = $1 AND role = 'ts_buyer'`;
-    const existingUser = await client.query(findUser, [req.decoded.id]);
 
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
-    if (existingUser.rows[0].balance < req.body.price) {
-      throw new Error("Insufficient balance to complete the purchase.");
-    }
+    const listingDetailsQuery = `SELECT id, price, expires_at FROM listings WHERE id = $1`;
 
     if (req.decoded.id === req.body.seller_id) {
       throw new Error("Cannot purchase your own listing.");
@@ -133,7 +151,6 @@ const purchaseListing = async (req, res) => {
 
     //add condition that if buyers already have this existing listing - disallow purchase.
 
-    const listingDetailsQuery = `SELECT id, price, expires_at FROM listings WHERE id = $1`;
     const listingDetails = await client.query(listingDetailsQuery, [
       req.body.listing_id,
     ]);
@@ -163,6 +180,18 @@ const purchaseListing = async (req, res) => {
 
     if (existingTransaction.rows.length > 0) {
       throw new Error("Transaction for this listing already exists.");
+    }
+
+    const checkBuyerBalanceQuery = `SELECT balance FROM users WHERE id = $1 AND role = $2;`;
+    const checkBuyerBalanceValues = [req.decoded.id, "ts_buyer"];
+
+    const buyerBalance = await client.query(
+      checkBuyerBalanceQuery,
+      checkBuyerBalanceValues
+    );
+
+    if (Number(buyerBalance.rows[0]?.balance) < subscriptionPrice) {
+      throw new Error("Insufficient Balance");
     }
 
     const transactionQuery = `INSERT INTO internal_transactions (buyer_id, seller_id, listing_id, price) 
@@ -357,7 +386,7 @@ const viewSubTransactionBySellerId = async (req, res) => {
 
     const subTransactionList = await pool.query(viewQuery, viewValues);
 
-    if (subTransactionList.rowCount === 0) {
+    if (subTransactionList.rows.length === 0) {
       return res
         .status(404)
         .json({ msg: "Failed to retrieve sub transactions." });
@@ -398,6 +427,79 @@ const viewSubTransactionByUserId = async (req, res) => {
   }
 };
 
+const viewOneSubTransaction = async (req, res) => {
+  try {
+    const viewQuery = `SELECT * FROM subscription_transactions
+    WHERE buyer_id = $1 AND seller_id = $2`;
+
+    const viewValues = [req.decoded.id, req.params.id];
+
+    const subTransactionList = await pool.query(viewQuery, viewValues);
+
+    if (subTransactionList.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve one sub transactions." });
+    }
+
+    res.status(200).json({
+      msg: "One sub transaction successfully retrieved.",
+      subTransaction: subTransactionList.rows[0],
+    });
+  } catch (err) {
+    console.error("View one sub transaction error", err);
+    res.status(500).json({ msg: "View one sub transaction failed." });
+  }
+};
+
+const viewSubCountByParamsId = async (req, res) => {
+  try {
+    const viewQuery = `SELECT COUNT(*) FROM subscription_transactions WHERE seller_id = $1`;
+
+    const viewValues = [req.params.id];
+
+    const subTransactionList = await pool.query(viewQuery, viewValues);
+
+    if (subTransactionList.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve sub transactions count." });
+    }
+
+    res.status(200).json({
+      msg: "Sub transactions count successfully retrieved.",
+      subTransaction: subTransactionList.rows,
+    });
+  } catch (err) {
+    console.error("View sub transaction count error", err);
+    res.status(500).json({ msg: "View sub transaction count failed." });
+  }
+};
+
+const viewSubCountById = async (req, res) => {
+  try {
+    const viewQuery = `SELECT COUNT(*) FROM subscription_transactions WHERE seller_id = $1`;
+
+    const viewValues = [req.decoded.id];
+
+    const subCount = await pool.query(viewQuery, viewValues);
+
+    if (subCount.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ msg: "Failed to retrieve sub transactions count." });
+    }
+
+    res.status(200).json({
+      msg: "Sub transactions count successfully retrieved.",
+      count: subCount.rows[0],
+    });
+  } catch (err) {
+    console.error("View sub transaction count error", err);
+    res.status(500).json({ msg: "View sub transaction count failed." });
+  }
+};
+
 module.exports = {
   depositMoney,
   withdrawMoney,
@@ -407,4 +509,9 @@ module.exports = {
   purchaseListing,
   viewSubTransactionBySellerId,
   viewSubTransactionByUserId,
+  viewOneSubTransaction,
+  viewSubCountByParamsId,
+  viewSubCountById,
+  getStripeKey,
+  sendPaymentRequest,
 };

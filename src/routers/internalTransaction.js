@@ -1,5 +1,5 @@
 const express = require("express");
-const { authBuyer, authSeller } = require("../middleware/auth");
+const { authBuyer, authSeller, isUser } = require("../middleware/auth");
 const {
   createInternalTransaction,
   viewInTransactionsByUserId,
@@ -7,6 +7,9 @@ const {
   viewInTransactionsBySellerId,
   viewSubTransactionBySellerId,
   viewSubTransactionByUserId,
+  viewOneSubTransaction,
+  viewSubCountByParamsId,
+  viewSubCountById,
 } = require("../controllers/transactions");
 const router = express.Router();
 
@@ -16,5 +19,8 @@ router.get("/sales", authSeller, viewInTransactionsBySellerId); // view sold lis
 router.post("/purchase", authBuyer, purchaseListing);
 router.get("/subs", authSeller, viewSubTransactionBySellerId);
 router.get("/subs/user", authBuyer, viewSubTransactionByUserId);
+router.get("/subs/:id", viewOneSubTransaction);
+router.get("/count/:id", viewSubCountByParamsId);
+router.get("/count", viewSubCountById);
 
 module.exports = router;

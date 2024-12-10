@@ -12,19 +12,20 @@ const createReview = async (req, res) => {
       throw new Error("User not found or invalid role.");
     }
 
-    const reviewQuery = `INSERT INTO reviews (buyer_id, seller_id, comment, rating) 
-      VALUES ($1, $2, $3, $4) RETURNING *`;
+    const reviewQuery = `INSERT INTO reviews (buyer_id, seller_id, comment, rating, title) 
+      VALUES ($1, $2, $3, $4, $5) RETURNING *`;
 
     const reviewValues = [
       req.decoded.id,
       req.params.id,
       req.body.comment,
       req.body.rating,
+      req.body.title,
     ];
 
     const newReview = await pool.query(reviewQuery, reviewValues);
 
-    if (newReview.rowCount === 0) {
+    if (newReview.rowCount.length === 0) {
       return res.status(404).json({ msg: "Failed to create review." });
     }
 
@@ -49,7 +50,7 @@ const viewReviews = async (req, res) => {
       throw new Error("User not found or invalid role.");
     }
 
-    const viewReviewsQuery = `SELECT * FROM reviews WHERE seller_id = $1`;
+    const viewReviewsQuery = `SELECT rev.*, users.first_name, users.last_name FROM reviews rev JOIN users ON buyer_id = users.id WHERE seller_id = $1 ORDER BY posted_on DESC`;
 
     const viewReviewsValues = [req.params.id];
 
@@ -61,11 +62,33 @@ const viewReviews = async (req, res) => {
 
     res.status(200).json({
       msg: "Reviews retrieved successfully.",
-      review: viewReviews.rows[0],
+      review: viewReviews.rows,
     });
   } catch (err) {
     console.error("Review retrieve error", err);
     res.status(500).json({ msg: "Review retrieve failed." });
+  }
+};
+
+const viewReviewsByUserId = async (req, res) => {
+  try {
+    const viewReviewsQuery = `SELECT rev.*, users.first_name, users.last_name FROM reviews rev JOIN users ON buyer_id = users.id WHERE buyer_id = $1`;
+
+    const viewReviewsValues = [req.decoded.id];
+
+    const viewReviews = await pool.query(viewReviewsQuery, viewReviewsValues);
+
+    if (viewReviews.rowCount === 0) {
+      return res.status(404).json({ msg: "Failed to fetch reviews." });
+    }
+
+    res.status(200).json({
+      msg: "User's review retrieved successfully.",
+      review: viewReviews.rows[0],
+    });
+  } catch (err) {
+    console.error("User's review retrieve error", err);
+    res.status(500).json({ msg: "User's review retrieve failed." });
   }
 };
 
@@ -78,13 +101,14 @@ const updateReview = async (req, res) => {
       throw new Error("User not found or invalid role.");
     }
 
-    const updateReviewQuery = `UPDATE reviews SET comment = $1, rating = $2, posted_on = CURRENT_TIMESTAMP, seller_id = $3, buyer_id = $4 RETURNING * `;
+    const updateReviewQuery = `UPDATE reviews SET comment = COALESCE($1, comment), rating = COALESCE($2, rating), posted_on = CURRENT_TIMESTAMP, seller_id = $3, buyer_id = $4, title = $5 RETURNING * `;
 
     const updateReviewValues = [
       req.body.comment,
       req.body.rating,
       req.params.id,
       req.decoded.id,
+      req.body.title,
     ];
 
     const updatedReview = await pool.query(
@@ -138,4 +162,10 @@ const deleteReview = async (req, res) => {
   }
 };
 
-module.exports = { createReview, viewReviews, updateReview, deleteReview };
+module.exports = {
+  createReview,
+  viewReviews,
+  updateReview,
+  deleteReview,
+  viewReviewsByUserId,
+};
