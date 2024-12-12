@@ -5,14 +5,34 @@ const {
   updateReview,
   deleteReview,
   viewReviewsByUserId,
+  viewReviewsBySellerId,
+  viewUniqueReview,
 } = require("../controllers/reviews");
-const { authBuyer } = require("../middleware/auth");
+const { authBuyer, authSeller, isUser } = require("../middleware/auth");
+const { validateCreateReview } = require("../validators/review");
+const { checkErrors } = require("../validators/checkErrors");
 const router = express.Router();
 
-router.post("/:id", createReview);
-router.get("/:id", viewReviews);
-router.put("/:id", authBuyer, updateReview);
-router.delete("/:id", deleteReview);
-router.get("/", viewReviewsByUserId);
+router.get("/biz", isUser, authSeller, viewReviewsBySellerId);
+router.post(
+  "/:id",
+  isUser,
+  authBuyer,
+  validateCreateReview,
+  checkErrors,
+  createReview
+);
+router.get("/:id", isUser, viewReviews);
+router.put(
+  "/:id",
+  isUser,
+  authBuyer,
+  validateCreateReview,
+  checkErrors,
+  updateReview
+);
+router.delete("/:id", isUser, authBuyer, deleteReview);
+router.get("/", isUser, viewReviewsByUserId);
+router.get("/review/:id", isUser, viewUniqueReview);
 
 module.exports = router;

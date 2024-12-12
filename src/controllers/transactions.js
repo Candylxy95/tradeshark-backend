@@ -15,10 +15,11 @@ const getStripeKey = async (req, res) => {
 const sendPaymentRequest = async (req, res) => {
   try {
     const paymentRequest = await stripe.paymentIntents.create({
-      amount: req.body.amount,
+      amount: req.body.amount * 100,
       currency: "sgd",
       payment_method_types: ["card"],
     });
+
     res.status(200).json({ clientSecret: paymentRequest.client_secret });
   } catch (error) {
     console.error("Error creating payments", error);
@@ -27,10 +28,6 @@ const sendPaymentRequest = async (req, res) => {
 };
 
 const depositMoney = async (req, res) => {
-  if (req.decoded.role !== "ts_buyer") {
-    return res.status(403).json({ msg: "Not authorised" });
-  }
-
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -96,6 +93,20 @@ const withdrawMoney = async (req, res) => {
       throw new Error("User not found or invalid role.");
     }
 
+    const checkBuyerBalanceQuery = `SELECT balance FROM users WHERE id = $1;`;
+    const checkBuyerBalanceValues = [req.decoded.id];
+
+    const buyerBalance = await client.query(
+      checkBuyerBalanceQuery,
+      checkBuyerBalanceValues
+    );
+
+    if (Number(buyerBalance.rows[0]?.balance) < req.body.amount) {
+      return res
+        .status(400)
+        .json({ msg: "You do not have sufficient balance." });
+    }
+
     const transactionQuery = `INSERT INTO external_transactions (user_id, user_role, transaction_type, amount) VALUES ($1, $2, $3, $4) RETURNING id, user_role, transaction_type, amount, transaction_date;`;
 
     const transactionValues = [
@@ -146,10 +157,8 @@ const purchaseListing = async (req, res) => {
     const listingDetailsQuery = `SELECT id, price, expires_at FROM listings WHERE id = $1`;
 
     if (req.decoded.id === req.body.seller_id) {
-      throw new Error("Cannot purchase your own listing.");
+      return res.status(400).json({ msg: "Cannot purchase your own listing." });
     }
-
-    //add condition that if buyers already have this existing listing - disallow purchase.
 
     const listingDetails = await client.query(listingDetailsQuery, [
       req.body.listing_id,
@@ -190,7 +199,7 @@ const purchaseListing = async (req, res) => {
       checkBuyerBalanceValues
     );
 
-    if (Number(buyerBalance.rows[0]?.balance) < subscriptionPrice) {
+    if (Number(buyerBalance.rows[0]?.balance) < listingPrice) {
       throw new Error("Insufficient Balance");
     }
 
@@ -248,50 +257,9 @@ const purchaseListing = async (req, res) => {
   }
 };
 
-//merged with purchase listing - should be can delete
-const createInternalTransaction = async (req, res) => {
-  try {
-    const inTransactionQuery = `INSERT INTO internal_transactions (buyer_id, seller_id, listing_id, price) 
-    VALUES ($1, $2, $3, $4) RETURNING *`;
-
-    const inTransactionValues = [
-      req.decoded.id,
-      req.body.seller_id,
-      req.body.listing_id,
-      req.body.price,
-    ];
-
-    const newInTransaction = await pool.query(
-      inTransactionQuery,
-      inTransactionValues
-    );
-
-    if (newInTransaction.rowCount === 0) {
-      return res
-        .status(404)
-        .json({ msg: "Failed to create internal transaction." });
-    }
-
-    res.status(200).json({
-      msg: "Internal Transaction successfully created.",
-      internal_transaction: newInTransaction.rows[0],
-    });
-  } catch (err) {
-    console.error("Internal Transaction creation error", err);
-    res.status(500).json({ msg: "Internal Transaction creation failed." });
-  }
-};
-
 //Buyer view purchases
 const viewInTransactionsByUserId = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT listings.ticker AS ticker,
     users.first_name AS seller_first_name,
     users.last_name AS seller_last_name,
@@ -328,13 +296,6 @@ const viewInTransactionsByUserId = async (req, res) => {
 //Seller view sales
 const viewInTransactionsBySellerId = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT listings.ticker AS ticker,
     users.first_name AS buyer_first_name,
     users.last_name AS buyer_last_name,
@@ -374,13 +335,13 @@ const viewSubTransactionBySellerId = async (req, res) => {
     users.first_name AS buyer_first_name,
     users.last_name AS buyer_last_name,
     st.price,
-    st.seller_id
+    st.seller_id,
     TO_CHAR(st.purchased_on, 'YYYY-MM-DD') AS purchased_date,
     TO_CHAR(st.purchased_on, 'HH24:MI:SS') AS purchased_time
     FROM subscription_transactions st
     JOIN users
-    ON buyer_id = users.id
-    WHERE st.seller_id = $1 ORDER BY purchased_on DESC`;
+    ON st.buyer_id = users.id
+    WHERE st.seller_id = $1 ORDER BY st.purchased_on DESC`;
 
     const viewValues = [req.decoded.id];
 
@@ -404,7 +365,12 @@ const viewSubTransactionBySellerId = async (req, res) => {
 
 const viewSubTransactionByUserId = async (req, res) => {
   try {
-    const viewQuery = `SELECT * FROM subcription_transactions
+    const viewQuery = `SELECT st.*, users.first_name, users.last_name, 
+    TO_CHAR(st.purchased_on, 'YYYY-MM-DD') AS purchased_date,
+    TO_CHAR(st.purchased_on, 'HH24:MI:SS') AS purchased_time,
+    TO_CHAR(st.expires_at, 'YYYY-MM-DD') AS expiry_date,
+    TO_CHAR(st.expires_at, 'HH24:MI:SS') AS expiry_time FROM subscription_transactions st JOIN users
+    ON st.seller_id = users.id
     WHERE buyer_id = $1 ORDER BY purchased_on DESC`;
 
     const viewValues = [req.decoded.id];
@@ -500,10 +466,31 @@ const viewSubCountById = async (req, res) => {
   }
 };
 
+const updateInternalTransactionsRated = async (req, res) => {
+  try {
+    const updateQuery = `UPDATE internal_transactions SET rated = NOT rated WHERE listing_id = $1 RETURNING *`;
+
+    const updateValues = [req.params.id];
+
+    const updatedRated = await pool.query(updateQuery, updateValues);
+
+    if (updatedRated.rowCount === 0) {
+      return res.status(404).json({ msg: "Failed to rate." });
+    }
+
+    res.status(200).json({
+      msg: "Successfully rated.",
+      rated: updatedRated.rows[0],
+    });
+  } catch (err) {
+    console.error("Update rated error", err);
+    res.status(500).json({ msg: "Update rated failed." });
+  }
+};
+
 module.exports = {
   depositMoney,
   withdrawMoney,
-  createInternalTransaction,
   viewInTransactionsByUserId,
   viewInTransactionsBySellerId,
   purchaseListing,
@@ -514,4 +501,5 @@ module.exports = {
   viewSubCountById,
   getStripeKey,
   sendPaymentRequest,
+  updateInternalTransactionsRated,
 };

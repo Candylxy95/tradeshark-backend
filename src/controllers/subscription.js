@@ -31,6 +31,7 @@ const setUpSubscription = async (req, res) => {
   }
 };
 
+//get by seller iD
 const getSubscriptionById = async (req, res) => {
   try {
     const subscriptionQuery = `SELECT * FROM subscriptions WHERE seller_id = $1`;
@@ -186,15 +187,19 @@ const getSubscriptionByParamsId = async (req, res) => {
 //view all active sub listings - posted before the end of subs expiry
 const viewAllSubListingsById = async (req, res) => {
   try {
-    const subscriptionQuery = `SELECT listings.* FROM subscription_transactions st
-    JOIN listings ON st.seller_id = listings.seller_id WHERE buyer_id = $1 
-    AND listings.posted_at < st.expires_at AND NOW() < listings.expires_at ORDER BY listings.posted_at`;
+    const subscriptionQuery = `SELECT lst.*, TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
+    TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
+    TO_CHAR(lst.expires_at, 'YYYY-MM-DD') AS expiry_date,
+    TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
+    users.first_name AS first_name, users.last_name AS last_name FROM subscription_transactions st
+    JOIN listings lst ON st.seller_id = lst.seller_id JOIN users on st.seller_id = users.id WHERE st.buyer_id = $1 
+    AND lst.posted_at < st.expires_at AND NOW() < lst.expires_at ORDER BY lst.posted_at;`;
 
     const subscriptionValues = [req.decoded.id];
 
     const sublistings = await pool.query(subscriptionQuery, subscriptionValues);
 
-    if (subscription.rows.length === 0) {
+    if (sublistings.rows.length === 0) {
       return res
         .status(404)
         .json({ msg: "Failed to retrieve subscription based listings." });

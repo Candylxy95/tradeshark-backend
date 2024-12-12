@@ -8,6 +8,7 @@ const {
   createExternalTransactionTable,
   createInternalTransactionTable,
   createSubscriptionTransactionTable,
+  createRatedTrigger,
 } = require("../models/Transactions");
 const {
   createListingTable,
@@ -38,6 +39,7 @@ const setUpDatabase = async () => {
   await createSubscriptionTransactionTable();
   await createProfileTable();
   await createProfileTrigger();
+  await createRatedTrigger();
 };
 
 module.exports = { setUpDatabase, setUpTimeZone };

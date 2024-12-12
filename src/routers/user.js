@@ -7,13 +7,18 @@ const {
   updateUserProfileById,
   viewUserByParamsId,
 } = require("../controllers/users");
+const { isUser } = require("../middleware/auth");
+const {
+  validateUpdateProfile,
+  validateLoginData,
+  validateRegistrationData,
+} = require("../validators/auth");
 const router = express.Router();
 
-router.get("/", viewUserById);
-router.patch("/balance", updateUserBalance);
-router.get("/profile", viewUserProfileById);
-router.patch("/profile", updateUserProfileById);
-router.patch("/user", updateUserById);
-router.get("/:id", viewUserByParamsId);
+router.get("/", isUser, viewUserById);
+router.get("/profile", isUser, viewUserProfileById);
+router.patch("/profile", isUser, updateUserProfileById);
+router.patch("/user", isUser, updateUserById);
+router.get("/:id", isUser, viewUserByParamsId);
 
 module.exports = router;

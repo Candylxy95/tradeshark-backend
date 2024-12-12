@@ -39,13 +39,6 @@ const createListing = async (req, res) => {
 
 const viewActiveListing = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT lst.*,
     TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
 TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
@@ -78,13 +71,6 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
 
 const viewSellerActiveListing = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT lst.*,
     TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
 TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
@@ -117,13 +103,6 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
 
 const viewExpiredListing = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT lst.*,
     TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
 TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
@@ -134,7 +113,7 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
     FROM listings lst
     JOIN users 
     ON lst.seller_id = users.id 
-    WHERE NOW() > expires_at ORDER BY posted_at DESC;`;
+    WHERE NOW() > expires_at AND lst.sold_as_single_listing = TRUE ORDER BY posted_at DESC;`;
 
     const activeListing = await pool.query(viewQuery);
 
@@ -156,13 +135,6 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
 
 const viewSellerExpiredListing = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT lst.*,
     TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
 TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
@@ -175,7 +147,7 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
     ON lst.seller_id = users.id 
     WHERE NOW() > expires_at AND users.id = $1 ORDER BY posted_at DESC;`;
 
-    const activeListing = await pool.query(viewQuery);
+    const activeListing = await pool.query(viewQuery, [req.decoded.id]);
 
     if (activeListing.rowCount === 0) {
       return res
@@ -195,16 +167,6 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
 
 const updateListing = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1 AND role = $2`;
-    const existingUser = await pool.query(findUser, [
-      req.decoded.id,
-      "ts_seller",
-    ]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const updateListingQuery = `UPDATE listings SET ticker = $1, asset_class = $2, position = $3, 
         entry_price = $4, take_profit = $5, stop_loss = $6, price = $7, notes = $8, duration = $9, img_src=$10, sold_as_single_listing=$11 WHERE id = $12 RETURNING *`;
 
@@ -246,13 +208,6 @@ const updateListing = async (req, res) => {
 
 const viewPurchasedActiveListingsById = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const listingQuery = `SELECT lst.*,
     TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
 TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
@@ -289,13 +244,6 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
 
 const viewListingById = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT lst.*,
     TO_CHAR(lst.posted_at, 'YYYY-MM-DD') AS posted_date,
 TO_CHAR(lst.posted_at, 'HH24:MI:SS') AS posted_time,
@@ -326,13 +274,6 @@ TO_CHAR(lst.expires_at, 'HH24:MI:SS') AS expiry_time,
 
 const viewListingHistoryById = async (req, res) => {
   try {
-    const findUser = `SELECT * FROM users WHERE id = $1`;
-    const existingUser = await pool.query(findUser, [req.decoded.id]);
-
-    if (existingUser.rows.length === 0) {
-      throw new Error("User not found or invalid role.");
-    }
-
     const viewQuery = `SELECT *, TO_CHAR(updated_at, 'YYYY-MM-DD') AS updated_date,
     TO_CHAR(updated_at, 'HH24:MI:SS') AS updated_time, TO_CHAR(posted_at, 'YYYY-MM-DD') AS posted_date, TO_CHAR(posted_at, 'HH24:MI:SS') AS posted_time FROM listing_history WHERE listing_id = $1`;
 

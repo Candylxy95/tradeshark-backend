@@ -47,7 +47,9 @@ const registration = async (req, res) => {
 const login = async (req, res) => {
   try {
     if (!req.body.email && !req.body.phone_number) {
-      return res.status(400).json({ msg: "Email or phone number is required" });
+      return res
+        .status(400)
+        .json({ msg: "Email or phone number is required." });
     }
     if (!req.body.password) {
       return res.status(400).json({ msg: "Password is required" });
@@ -75,17 +77,14 @@ const login = async (req, res) => {
       id: existingUser.rows[0].id,
       name: existingUser.rows[0].first_name,
       role: existingUser.rows[0].role,
+      email: existingUser.rows[0].email,
     };
     const access = jwt.sign(claims, process.env.ACCESS_SECRET, {
       expiresIn: "15d",
       jwtid: uuidv4(),
     });
 
-    const refresh = jwt.sign(claims, process.env.REFRESH_SECRET, {
-      expiresIn: "30d",
-      jwtid: uuidv4(),
-    });
-    res.status(200).json({ msg: "Successfully logged in", access, refresh });
+    res.status(200).json({ msg: "Successfully logged in", access });
   } catch (error) {
     console.log(error);
     res.status(500).json({ msg: "Login failed." });

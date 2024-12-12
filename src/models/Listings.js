@@ -100,7 +100,6 @@ const createUpdateTrigger = async () => {
   }
 };
 
-//remember condition to make this available to sellers only
 module.exports = {
   createListingTable,
   createListingHistoryTable,

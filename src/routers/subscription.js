@@ -6,14 +6,23 @@ const {
   getSubscriptionByParamsId,
   viewAllSubListingsById,
 } = require("../controllers/subscription");
-const { authBuyer, authSeller } = require("../middleware/auth");
+const { authBuyer, authSeller, isUser } = require("../middleware/auth");
+const { validateSubscriptionSetUp } = require("../validators/subscription");
+const { checkErrors } = require("../validators/checkErrors");
 
 const router = express.Router();
 
-router.post("/", authSeller, setUpSubscription);
-router.get("/", getSubscriptionById);
-router.get("/:id", getSubscriptionByParamsId);
-router.put("/:id", purchaseSubscription);
-router.get("/sublistings", authBuyer, viewAllSubListingsById);
+router.post(
+  "/",
+  isUser,
+  authSeller,
+  validateSubscriptionSetUp,
+  checkErrors,
+  setUpSubscription
+);
+router.get("/subs", isUser, authBuyer, viewAllSubListingsById);
+router.get("/", isUser, authSeller, getSubscriptionById);
+router.get("/:id", isUser, authBuyer, getSubscriptionByParamsId);
+router.put("/:id", isUser, authBuyer, purchaseSubscription);
 
 module.exports = router;

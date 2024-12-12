@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { pool } = require("../db/db");
 
 const isSignedIn = (req, res, next) => {
   if (!("authorization" in req.headers)) {
@@ -29,7 +30,7 @@ const authBuyer = (req, res, next) => {
     } else
       return res
         .status(403)
-        .json({ status: "error", mag: "you're not authorised" });
+        .json({ status: "error", mag: "You're not authorised" });
   } catch (error) {
     console.error(error.message);
     return res.status(401).json({ status: "error", msg: "not authorised" });
@@ -62,7 +63,7 @@ const isUser = async (req, res, next) => {
     next();
   } catch (error) {
     console.error(error.message);
-    return res.status(401).json({ status: "error", msg: "not authorised" });
+    return res.status(401).json({ status: "error", msg: "Not authorised." });
   }
 };
 
