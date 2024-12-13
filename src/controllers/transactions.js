@@ -424,17 +424,11 @@ const viewSubCountByParamsId = async (req, res) => {
 
     const viewValues = [req.params.id];
 
-    const subTransactionList = await pool.query(viewQuery, viewValues);
-
-    if (subTransactionList.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ msg: "Failed to retrieve sub transactions count." });
-    }
+    const subCount = await pool.query(viewQuery, viewValues);
 
     res.status(200).json({
       msg: "Sub transactions count successfully retrieved.",
-      subTransaction: subTransactionList.rows,
+      count: parseInt(subCount.rows[0].count, 10),
     });
   } catch (err) {
     console.error("View sub transaction count error", err);
@@ -450,15 +444,9 @@ const viewSubCountById = async (req, res) => {
 
     const subCount = await pool.query(viewQuery, viewValues);
 
-    if (subCount.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ msg: "Failed to retrieve sub transactions count." });
-    }
-
     res.status(200).json({
       msg: "Sub transactions count successfully retrieved.",
-      count: subCount.rows[0],
+      count: parseInt(subCount.rows[0].count, 10),
     });
   } catch (err) {
     console.error("View sub transaction count error", err);

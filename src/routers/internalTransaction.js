@@ -21,7 +21,7 @@ router.get("/subs", isUser, authSeller, viewSubTransactionBySellerId);
 router.get("/rated/:id", updateInternalTransactionsRated);
 router.get("/subs/user", isUser, authBuyer, viewSubTransactionByUserId);
 router.get("/subs/:id", isUser, authBuyer, viewOneSubTransaction);
-router.get("/count/:id", isUser, authBuyer, viewSubCountByParamsId);
-router.get("/count", isUser, authSeller, viewSubCountById);
+router.get("/count/:id", isUser, viewSubCountByParamsId);
+router.get("/count", isUser, viewSubCountById);
 
 module.exports = router;
